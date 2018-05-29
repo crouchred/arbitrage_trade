@@ -9,9 +9,10 @@ from config import *
 
 class Market:
 
-    def __init__(self, product, basecoin):
+    def __init__(self, product, basecoin, min_amount):
         self.product = product.upper()
         self.basecoin = basecoin.upper()
+        self.min_amount = min_amount
 
     def get_balance_position(self):
         """product的仓位"""
@@ -27,34 +28,113 @@ class Market:
         raise NotImplementedError('')
 
     def get_depth(self):
+        """ return 
+        {'buy_one': {'price': '0.00013777', 'volume': '495.5544'},
+         'sell_one': {'price': '0.00013911', 'volume': '2297.409'}}
+        """
         raise NotImplementedError('')
 
-    def get_average_price(self):
-        raise NotImplementedError('')
-
-    def list_order(self):
+    def get_open_orders(self):
         raise NotImplementedError('')
 
     def clear_open_orders(self):
         raise NotImplementedError('')
 
+    def _get_week_prices(self):
+        raise NotImplementedError('')
+
+    def get_average_price(self):
+        closes = self._get_week_prices()
+        return sum(closes) / len(closes)
+
+    def get_high_price(self):
+        closes = self._get_week_prices()
+        return max(closes)
+
+    def get_low_price(self):
+        closes = self._get_week_prices()
+        return min(closes)
+
+    def clear_open_orders(self):
+        orders = [o['order_id'] for o in self.get_open_orders()]
+        print("orders before clear: %s"%(orders))
+        for order in orders:
+            self.cancel_order(order)
+
+        orders = [o['order_id'] for o in self.get_open_orders()]
+        print("orders after clear: %s"%(orders))
+        return 0 
+
 class Binance(Market):
-    def __init__(self, product, basecoin):
-        super().__init__(product, basecoin)
+    def __init__(self, product, basecoin, min_amount=1):
+        super().__init__(product, basecoin, min_amount)
         self.client = Client(binance_api_key, binance_secret_key, {'proxies': proxies})
         self.trade_pair = self.product + self.basecoin
 
-    def list_order(self):
-        pass
+    def get_balance(self):
+        result = self.client.get_asset_balance(asset=self.basecoin)
+        basecoin_amount = float(result['free']) + float(result['locked'])
+        result = self.client.get_asset_balance(asset=self.product)
+        product_amount = float(result['free']) + float(result['locked'])
+        return {'product': product_amount, 'basecoin': basecoin_amount}
 
-    def get_depth(self):
-        depth = self.client.get_order_book(self.trade_pair)
-        result = depth # todo 
+    def get_balance_position(self):
+        result = self.client.get_asset_balance(asset=self.basecoin)
+        basecoin_amount = float(result['free']) + float(result['locked'])
+        result = self.client.get_asset_balance(asset=self.product)
+        product_amount = float(result['free']) + float(result['locked'])
+
+        depth = self.get_depth()
+        price = (depth['buy_one']['price'] + depth['sell_one']['price'])/2
+
+        return product_amount*price / (product_amount*price+basecoin_amount)
+
+    def get_open_orders(self):
+        orders = self.client.get_open_orders(symbol=self.trade_pair)
+        result = []
+        for order in orders:
+            result.append({
+                    'order_id': order['orderId'],
+                    'side': order['side'],
+                    'price': float(order['price']),
+                    'time': order['time'],
+                    'amount': float(order['origQty']),
+                    'deal_amount': float(order['executedQty'])
+                    })
         return result
 
+    def buy(self, price, amount):
+        order = self.client.order_limit_buy(symbol=self.trade_pair, \
+            quantity=amount, price=price)
+        return order['orderId']
+
+    def sell(self, price, amount):
+        order = self.client.order_limit_sell(
+            symbol=self.trade_pair,
+            quantity=amount,
+            price=price)
+        return order['orderId']
+
+    def cancel_order(self, order_id):
+        result = self.client.cancel_order(
+            symbol=self.trade_pair,
+            orderId=order_id)
+        return 0
+
+    def get_depth(self):
+        depth = self.client.get_order_book(symbol=self.trade_pair)
+        buy_one = {'price': float(depth['bids'][0][0]), 'volumn': float(depth['bids'][0][1])}
+        sell_one = {'price': float(depth['asks'][0][0]), 'volumn': float(depth['asks'][0][1])}
+        return {'buy_one': buy_one, 'sell_one': sell_one}
+
+    def _get_week_prices(self):
+        data = self.client.get_klines(symbol=self.trade_pair, interval=Client.KLINE_INTERVAL_1HOUR)[-168:-1]
+        closes = [float(i[4]) for i in data]
+        return closes
+
 class Bibox(Market):
-    def __init__(self, product, basecoin):
-        super().__init__(product, basecoin)
+    def __init__(self, product, basecoin, min_amount=0.1):
+        super().__init__(product, basecoin, min_amount)
         self.trade_pair = self.product + "_" + self.basecoin
         self.uri = "https://api.bibox.com/v1"
 
@@ -110,9 +190,9 @@ class Bibox(Market):
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
-        #return  todo
+        return 0
 
-    def list_order(self):
+    def get_open_orders(self):
         url = "https://api.bibox.com/v1/orderpending"
         cmds = [
                 {
@@ -129,7 +209,36 @@ class Bibox(Market):
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
-        return [i['id'] for i in data['items']]
+        orders = data['items']
+        result = []
+        for order in orders:
+            result.append({
+                'order_id': order['id'],
+                'side': 'BUY' if order['order_side']==1 else 'SELL',
+                'price': float(order['price']),
+                'time': order['createdAt'],
+                'amount': float(order['amount']),
+                'deal_amount': float(order['deal_amount'])
+                })
+        return result 
+
+    def get_balance(self):
+        url = "https://api.bibox.com/v1/transfer"
+        cmds = [
+                {
+                    'cmd': 'transfer/assets',
+                    'body': {
+                        'select': 1
+                        }
+                    }
+                ]
+        data =  self.__doApiRequestWithApikey(url,cmds)
+        for asset in data['assets_list']:
+            if asset['coin_symbol'] == self.basecoin:
+                basecoin_amount = float(asset['balance'])
+            elif asset['coin_symbol'] == self.product:
+                product_amount = float(asset['balance'])
+        return {'product': product_amount, 'basecoin': basecoin_amount}
 
     def get_balance_position(self):
         url = "https://api.bibox.com/v1/transfer"
@@ -154,7 +263,7 @@ class Bibox(Market):
 
         return product_balance / (product_balance + basecoin_balance)
 
-    def __get_week_prices(self):
+    def _get_week_prices(self):
         """过去一周的每小时close价格"""
         url = "https://api.bibox.com/v1/mdata?cmd=kline&pair={trade_pair}&period=1hour&size=168" \
                 .format(trade_pair=self.trade_pair)
@@ -163,23 +272,7 @@ class Bibox(Market):
         closes = [float(i['close']) for i in data['result']]
         return closes
 
-    def get_average_price(self):
-        closes = self.__get_week_prices()
-        return sum(closes) / len(closes)
-
-    def get_high_price(self):
-        closes = self.__get_week_prices()
-        return max(closes)
-
-    def get_low_price(self):
-        closes = self.__get_week_prices()
-        return min(closes)
-
     def get_depth(self):
-        """ return 
-        {'buy_one': {'price': '0.00013777', 'volume': '495.5544'},
-         'sell_one': {'price': '0.00013911', 'volume': '2297.409'}}
-        """
         url = "https://api.bibox.com/v1/mdata?cmd=depth&pair={trade_pair}&size=10"\
                 .format(trade_pair=self.trade_pair)
         r = requests.get(url, proxies=proxies)
@@ -194,14 +287,15 @@ class Bibox(Market):
 
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
-    def clear_open_orders(self):
-        orders = self.list_order()
-        print("orders before clear: %s"%(orders))
-        for order in orders:
-            self.cancel_order(order)
-        print("orders after clear: %s"%(self.list_order()))
 
 if __name__=="__main__":
-    a = Bibox('EOS', 'BTC')
-    a.clear_open_orders()
+    bibox = Bibox('EOS', 'BTC')
+    print(bibox.get_balance())
+    print(bibox.get_open_orders())
+    print(bibox.clear_open_orders())
+
+    binance = Binance('EOS', 'BTC')
+    print(binance.get_balance())
+    print(binance.get_open_orders())
+    print(binance.clear_open_orders())
 

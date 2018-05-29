@@ -4,11 +4,16 @@ from utils.market import Bibox, Binance
 
 class TestMarketBaseMixin():
         
-    def setUp(self):
+    def __init__(self):
         raise NotImplementedError('')
-        #self.client = SomeClass('EOS', 'BTC')
+        #self.min_amount = 0
+        #self.client = SomeClass('EOS', 'BTC', self.min_amount)
 
     def test_balance(self):
+        balance = self.client.get_balance()
+        print("balance: %s"%(balance))
+
+    def test_balance_position(self):
         balance = self.client.get_balance_position()
         print("balance position: %s"%(balance))
         self.assertTrue(0<= balance <= 1)
@@ -27,8 +32,8 @@ class TestMarketBaseMixin():
 
         low = self.client.get_low_price()
         print("low price: %s"%(low))
-        order_id =  self.client.buy(low, 0.01)
-        orders = self.client.list_order()
+        order_id =  self.client.buy(low, self.min_amount)
+        orders = [o['order_id'] for o in self.client.get_open_orders()]
         self.assertTrue(order_id in orders)
         order_id =  self.client.cancel_order(order_id)
         self.assertFalse(order_id in orders)
@@ -36,16 +41,27 @@ class TestMarketBaseMixin():
     def test_sell(self):
         high = self.client.get_high_price()
         print("high price: %s"%(high))
-        order_id =  self.client.sell(high, 0.01)
-        orders = self.client.list_order()
+        order_id =  self.client.sell(high, self.min_amount)
+        orders = [o['order_id'] for o in self.client.get_open_orders()]
         self.assertTrue(order_id in orders)
         order_id =  self.client.cancel_order(order_id)
         self.assertFalse(order_id in orders)
 
-class TestBiboxUtil(unittest.TestCase, TestMarketBaseMixin):
-        
-    def setUp(self):
-        self.client = Bibox('EOS', 'BTC')
+class TestBibox(unittest.TestCase, TestMarketBaseMixin):
+
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self, *args, **kwargs)
+        self.min_amount = 0.1
+        self.client = Bibox('EOS', 'BTC', self.min_amount)
+        print("Here is bibox")
+
+class TestBinance(unittest.TestCase, TestMarketBaseMixin):
+
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self, *args, **kwargs)
+        self.min_amount = 1
+        self.client = Binance('EOS', 'BTC', self.min_amount)
+        print("Here is binance")
 
 if __name__=="__main__":
     unittest.main()
