@@ -1,6 +1,6 @@
 import unittest
 
-from utils.market import Bibox, Binance
+from market import Bibox, Binance
 
 class TestMarketBaseMixin():
         

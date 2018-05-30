@@ -5,24 +5,28 @@ import hashlib
 import json, requests
 
 from config import *
+from utils.logger import Logger
+logger = Logger.get_logger("market")
 
 class Market:
 
     def __init__(self, product, basecoin):
         self.product = product.upper()
         self.basecoin = basecoin.upper()
+        self.feecoin = ""
 
     def get_profit_ratio(self, side='BUY'):
         """根据仓位确定需要的盈利率系数"""
-        balance_position = self.get_profit_ratio()
+        balance_position = self.get_balance_position()
         if side == 'SELL':
             balance_position = 1 - balance_position
         if 0 <= balance_position <= 0.1:
             ratio = 1
         elif 0.2 < balance_position <= 0.8:
-            ratio = 3
+            ratio = 1.2
         elif 0.9 < balance_position:
-            ratio = 10
+            ratio = 5
+        return ratio
 
     def get_fee(self):
         raise NotImplementedError('')
@@ -70,12 +74,12 @@ class Market:
 
     def clear_open_orders(self):
         orders = [o['order_id'] for o in self.get_open_orders()]
-        print("orders before clear: %s"%(orders))
+        logger.info("orders before clear: %s"%(orders))
         for order in orders:
             self.cancel_order(order)
 
         orders = [o['order_id'] for o in self.get_open_orders()]
-        print("orders after clear: %s"%(orders))
+        logger.info("orders after clear: %s"%(orders))
         return 0 
 
 class Binance(Market):
@@ -83,6 +87,7 @@ class Binance(Market):
         super().__init__(product, basecoin)
         self.client = Client(binance_api_key, binance_secret_key, {'proxies': proxies})
         self.trade_pair = self.product + self.basecoin
+        self.feecoin = "BNB"
 
     def get_fee(self):
         return 0.0005
@@ -92,7 +97,9 @@ class Binance(Market):
         basecoin_amount = float(result['free']) + float(result['locked'])
         result = self.client.get_asset_balance(asset=self.product)
         product_amount = float(result['free']) + float(result['locked'])
-        return {'product': product_amount, 'basecoin': basecoin_amount}
+        result = self.client.get_asset_balance(asset=self.feecoin)
+        feecoin_amount = float(result['free']) + float(result['locked'])
+        return {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
 
     def get_balance_position(self):
         result = self.client.get_asset_balance(asset=self.basecoin)
@@ -122,19 +129,24 @@ class Binance(Market):
     def buy(self, price, amount):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
-        return order['orderId']
+        order_id = order['orderId']
+        logger.info("[binance][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        return order_id
 
     def sell(self, price, amount):
         order = self.client.order_limit_sell(
             symbol=self.trade_pair,
             quantity=amount,
             price=price)
-        return order['orderId']
+        order_id = order['orderId']
+        logger.info("-->[binance][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        return order_id
 
     def cancel_order(self, order_id):
         result = self.client.cancel_order(
             symbol=self.trade_pair,
             orderId=order_id)
+        logger.info("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, order_id))
         return 0
 
     def get_depth(self, min_amount=0):
@@ -157,6 +169,7 @@ class Bibox(Market):
         super().__init__(product, basecoin)
         self.trade_pair = self.product + "_" + self.basecoin
         self.uri = "https://api.bibox.com/v1"
+        self.feecoin = "BIX"
 
     def get_fee(self):
         return 0.0005
@@ -197,10 +210,14 @@ class Bibox(Market):
         return data
 
     def buy(self, price, amount):
-        return self.__post_order(1, price, amount)
+        order_id = self.__post_order(1, price, amount)
+        logger.info("[bibox][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        return order_id
 
     def sell(self, price, amount):
-        return self.__post_order(2, price, amount)
+        order_id = self.__post_order(2, price, amount)
+        logger.info("[bibox][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        return order_id
 
     def cancel_order(self, order_id):
         url = "https://api.bibox.com/v1/orderpending"
@@ -213,6 +230,7 @@ class Bibox(Market):
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
+        logger.info("[bibox][cancel][%s][order:%s]"%(self.trade_pair, order_id))
         return 0
 
     def get_open_orders(self):
@@ -261,7 +279,9 @@ class Bibox(Market):
                 basecoin_amount = float(asset['balance'])
             elif asset['coin_symbol'] == self.product:
                 product_amount = float(asset['balance'])
-        return {'product': product_amount, 'basecoin': basecoin_amount}
+            elif asset['coin_symbol'] == self.feecoin:
+                feecoin_amount = float(asset['balance'])
+        return {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
 
     def get_balance_position(self):
         url = "https://api.bibox.com/v1/transfer"
@@ -318,14 +338,15 @@ class Bibox(Market):
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')
-    print(bibox.get_depth())
-#    print(bibox.get_balance())
+#    print(bibox.get_depth())
+    print(bibox.get_balance())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())
 #
+    print("bibox<------->binance")
     binance = Binance('EOS', 'BTC')
-    print(binance.get_depth())
-#    print(binance.get_balance())
+#    print(binance.get_depth())
+    print(binance.get_balance())
 #    print(binance.get_open_orders())
 #    print(binance.clear_open_orders())
 #

@@ -1,4 +1,3 @@
-
 class Strategy:
 
     def __init__(self, m1, m2, min_amount=1, max_amount=5):
@@ -19,25 +18,56 @@ class Strategy:
         m1_buy_ratio = self.get_fee_total() * self.m1.get_profit_ratio('BUY') + 1
         m1_sell_ratio = self.get_fee_total() * self.m1.get_profit_ratio('SELL') + 1
     
-        if self.s1(m1_depth, m2_depth, m1_sell_ratio):
-            return 
-        if self.s2(m1_depth, m2_depth, m1_sell_ratio):
-            return 
+        StrategyPlanClassList = [StrategyPlan1, StrategyPlan2]
+        for StrategyPlanClass in StrategyPlanClassList:
+            strategy = StrategyPlanClass(m1=self.m1, m2=self.m2, m1_depth=m1_depth, m2_depth=m2_depth, \
+                    m1_buy_ratio=m1_buy_ratio, m1_sell_ratio=m1_sell_ratio, max_amount=self.max_amount)
+            if strategy.check():
+                strategy.exe()
+                break
 
-    def s1(self, m1_depth, m2_depth, m1_buy_ratio, m1_sell_ratio):
+class StrategyPlan:
 
-        if m1_depth['buy_one']['price'] / m2_depth['sell_one']['price'] > m1_sell_ratio:
-            amount = min(m1_depth['buy_one']['amount'], m2_depth['sell_one']['amount'], \
-                    self.max_amount)
-            self.m1.sell(m1_depth['buy_one']['price'], amount)
-            self.m2.buy(m2_depth['sell_one']['price'], amount)
-            return True
+    def __init__(self, **kw):
+        self.m1 = kw['m1']
+        self.m2 = kw['m2']
+        self.m1_depth = kw['m1_depth']
+        self.m2_depth = kw['m2_depth']
+        self.m1_buy_ratio = kw['m1_buy_ratio']
+        self.m1_sell_ratio = kw['m1_sell_ratio']
+        self.max_amount = kw['max_amount']
 
-    def s2(self, m1_depth, m2_depth):
+    def adjust_amount(self, amount):
+        amount = min(amount, self.max_amount)
+        amount = int(amount*10) / 10
+        return amount
 
-        if m1_depth['sell_one']['price'] / m2_depth['buy_one']['price'] > m1_buy_ratio:
-            amount = min(m1_depth['sell_one']['amount'], m2_depth['buy_one']['amount'], \
-                    self.max_amount)
-            self.m1.buy(m1_depth['sell_one']['price'], amount)
-            self.m2.sell(m2_depth['buy_one']['price'], amount)
+    def check(self):
+        raise NotImplementedError('')
+
+    def exe(self):
+        raise NotImplementedError('')
+
+class StrategyPlan1(StrategyPlan):
+
+    def check(self):
+        return self.m1_depth['buy_one']['price'] / self.m2_depth['sell_one']['price'] > self.m1_sell_ratio
+
+    def exe(self):
+        amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
+        amount = self.adjust_amount(amount)
+        self.m1.sell(self.m1_depth['buy_one']['price'], amount)
+        self.m2.buy(self.m2_depth['sell_one']['price'], amount)
+
+class StrategyPlan2(StrategyPlan):
+
+    def check(self):
+        return self.m2_depth['buy_one']['price'] / self.m1_depth['sell_one']['price'] > self.m1_buy_ratio
+
+    def exe(self):
+        amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
+        amount = self.adjust_amount(amount)
+        self.m1.buy(self.m1_depth['sell_one']['price'], amount)
+        self.m2.sell(self.m2_depth['buy_one']['price'], amount)
+
      
