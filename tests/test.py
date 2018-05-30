@@ -47,12 +47,18 @@ class TestMarketBaseMixin():
         order_id =  self.client.cancel_order(order_id)
         self.assertFalse(order_id in orders)
 
+    def test_depth(self):
+        depth = self.client.get_depth(min_amount=self.min_amount)
+        self.assertTrue(depth['sell_one']['price']>depth['buy_one']['price'])
+        self.assertTrue(depth['sell_one']['amount']>self.min_amount)
+        self.assertTrue(depth['buy_one']['amount']>self.min_amount)
+
 class TestBibox(unittest.TestCase, TestMarketBaseMixin):
 
     def __init__(self, *args, **kwargs):
         unittest.TestCase.__init__(self, *args, **kwargs)
         self.min_amount = 0.1
-        self.client = Bibox('EOS', 'BTC', self.min_amount)
+        self.client = Bibox('EOS', 'BTC')
         print("Here is bibox")
 
 class TestBinance(unittest.TestCase, TestMarketBaseMixin):
@@ -60,7 +66,7 @@ class TestBinance(unittest.TestCase, TestMarketBaseMixin):
     def __init__(self, *args, **kwargs):
         unittest.TestCase.__init__(self, *args, **kwargs)
         self.min_amount = 1
-        self.client = Binance('EOS', 'BTC', self.min_amount)
+        self.client = Binance('EOS', 'BTC')
         print("Here is binance")
 
 if __name__=="__main__":

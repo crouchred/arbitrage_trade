@@ -6,14 +6,27 @@ import json, requests
 
 from config import *
 
-
 class Market:
 
-    def __init__(self, product, basecoin, min_amount):
+    def __init__(self, product, basecoin):
         self.product = product.upper()
         self.basecoin = basecoin.upper()
-        self.min_amount = min_amount
 
+    def get_profit_ratio(self, side='BUY'):
+        """根据仓位确定需要的盈利率系数"""
+        balance_position = self.get_profit_ratio()
+        if side == 'SELL':
+            balance_position = 1 - balance_position
+        if 0 <= balance_position <= 0.1:
+            ratio = 1
+        elif 0.2 < balance_position <= 0.8:
+            ratio = 3
+        elif 0.9 < balance_position:
+            ratio = 10
+
+    def get_fee(self):
+        raise NotImplementedError('')
+    
     def get_balance_position(self):
         """product的仓位"""
         raise NotImplementedError('')
@@ -66,10 +79,13 @@ class Market:
         return 0 
 
 class Binance(Market):
-    def __init__(self, product, basecoin, min_amount=1):
-        super().__init__(product, basecoin, min_amount)
+    def __init__(self, product, basecoin):
+        super().__init__(product, basecoin)
         self.client = Client(binance_api_key, binance_secret_key, {'proxies': proxies})
         self.trade_pair = self.product + self.basecoin
+
+    def get_fee(self):
+        return 0.0005
 
     def get_balance(self):
         result = self.client.get_asset_balance(asset=self.basecoin)
@@ -121,10 +137,14 @@ class Binance(Market):
             orderId=order_id)
         return 0
 
-    def get_depth(self):
+    def get_depth(self, min_amount=0):
         depth = self.client.get_order_book(symbol=self.trade_pair)
-        buy_one = {'price': float(depth['bids'][0][0]), 'volumn': float(depth['bids'][0][1])}
-        sell_one = {'price': float(depth['asks'][0][0]), 'volumn': float(depth['asks'][0][1])}
+
+        bids = [i for i in depth['bids'] if float(i[1])>=min_amount][0]
+        asks = [i for i in depth['asks'] if float(i[1])>=min_amount][0]
+
+        buy_one = {'price': float(bids[0]), 'amount': float(bids[1])}
+        sell_one = {'price': float(asks[0]), 'amount': float(asks[1])}
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
     def _get_week_prices(self):
@@ -133,10 +153,13 @@ class Binance(Market):
         return closes
 
 class Bibox(Market):
-    def __init__(self, product, basecoin, min_amount=0.1):
-        super().__init__(product, basecoin, min_amount)
+    def __init__(self, product, basecoin):
+        super().__init__(product, basecoin)
         self.trade_pair = self.product + "_" + self.basecoin
         self.uri = "https://api.bibox.com/v1"
+
+    def get_fee(self):
+        return 0.0005
 
     def __getSign(self, data,secret):
         result = hmac.new(secret.encode("utf-8"), data.encode("utf-8"), hashlib.md5).hexdigest()
@@ -272,30 +295,37 @@ class Bibox(Market):
         closes = [float(i['close']) for i in data['result']]
         return closes
 
-    def get_depth(self):
+    def get_depth(self, min_amount=0):
         url = "https://api.bibox.com/v1/mdata?cmd=depth&pair={trade_pair}&size=10"\
                 .format(trade_pair=self.trade_pair)
         r = requests.get(url, proxies=proxies)
         data = json.loads(r.text)
-        buy_one = data['result']['bids'][0]
-        sell_one = data['result']['asks'][0]
+        bids = data['result']['bids']
+        asks = data['result']['asks']
+
+        buy_one = [i for i in bids if float(i['volume'])>=min_amount][0]
+        sell_one = [i for i in asks if float(i['volume'])>=min_amount][0]
 
         buy_one['price'] = float(buy_one['price'])
-        buy_one['volume'] = float(buy_one['price'])
-        sell_one['price'] = float(buy_one['price'])
-        sell_one['volume'] = float(buy_one['price'])
+        buy_one['amount'] = float(buy_one['volume'])
+        buy_one.pop('volume')
+        sell_one['price'] = float(sell_one['price'])
+        sell_one['amount'] = float(sell_one['volume'])
+        sell_one.pop('volume')
 
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')
-    print(bibox.get_balance())
-    print(bibox.get_open_orders())
-    print(bibox.clear_open_orders())
-
+    print(bibox.get_depth())
+#    print(bibox.get_balance())
+#    print(bibox.get_open_orders())
+#    print(bibox.clear_open_orders())
+#
     binance = Binance('EOS', 'BTC')
-    print(binance.get_balance())
-    print(binance.get_open_orders())
-    print(binance.clear_open_orders())
-
+    print(binance.get_depth())
+#    print(binance.get_balance())
+#    print(binance.get_open_orders())
+#    print(binance.clear_open_orders())
+#
