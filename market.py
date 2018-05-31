@@ -22,7 +22,7 @@ class Market:
             balance_position = 1 - balance_position
         if 0 <= balance_position <= 0.1:
             ratio = 1
-        elif 0.2 < balance_position <= 0.8:
+        elif 0.1 < balance_position <= 0.9:
             ratio = 1.2
         elif 0.9 < balance_position:
             ratio = 5
