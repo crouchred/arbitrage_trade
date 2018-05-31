@@ -378,10 +378,10 @@ class Bibox(Market):
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')
-    print(bibox.get_order_detail(587083712))
+#    print(bibox.get_order_detail(587083712))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
-#    print(bibox.get_balance())
+    print(bibox.get_balance())
 #    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())
@@ -391,7 +391,7 @@ if __name__=="__main__":
 #    print(binance.get_order_detail(56126001))
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
-#    print(binance.get_balance())
+    print(binance.get_balance())
 #    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
 #    print(binance.clear_open_orders())
