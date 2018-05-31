@@ -80,10 +80,10 @@ class StrategyPlan:
         else:
             if order['deal_amount'] != order['amount']: # 未完成订单
                 self.origin_market.cancel_order(order_id)
-            hedge_order_id = self.hedge_market.sell(order_in_redis['hedge']['price'], \
+            hedge_order_id = self.hedge_market.__getattribute__(\
+                    order_in_redis['hedge']['action'])(order_in_redis['hedge']['price'], \
                     min(order['deal_amount'], self.min_amount))
             r.sadd('hedge_order_ids', hedge_order_id)    
-
 
     def adjust_amount(self, amount):
         amount = min(amount, self.max_amount)
@@ -140,7 +140,7 @@ class StrategyPlan3(StrategyPlan):
         amount = self.m2_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m1.sell(self.m1_depth['sell_one']['price']-self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge_price':self.m2_depth['sell_one']['price']})    
+        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'sell'}})    
 
 class StrategyPlan4(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -151,10 +151,46 @@ class StrategyPlan4(StrategyPlan):
 
     def check(self):
         """m2的卖单>m1的卖单"""
-        return self.m1_depth['sell_one']['price'] / self.m2_depth['sell_one']['price'] < self.m1_buy_ratio
+        return self.m2_depth['sell_one']['price'] / self.m1_depth['sell_one']['price'] > self.m1_buy_ratio
 
     def exe(self):
         amount = self.m1_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m2.sell(self.m2_depth['sell_one']['price']-self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge_price':self.m1_depth['sell_one']['price']})    
+        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'sell'}})    
+
+class StrategyPlan5(StrategyPlan):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.name = 'plan5'
+        self.origin_market = self.m1
+        self.hedge_market = self.m2
+
+    def check(self):
+        """m1的买单<m2的买单"""
+        return self.m2_depth['buy_one']['price'] / self.m1_depth['buy_one']['price'] > self.m1_buy_ratio
+
+    def exe(self):
+        amount = self.m2_depth['buy_one']['amount']
+        amount = self.adjust_amount(amount)
+        order_id = self.m1.buy(self.m1_depth['buy_one']['price']+self.skip_price, amount)
+        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'buy'}})    
+
+class StrategyPlan6(StrategyPlan):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.name = 'plan6'
+        self.origin_market = self.m2
+        self.hedge_market = self.m1
+
+    def check(self):
+        """m1的买单>m2的买单"""
+        return self.m1_depth['buy_one']['price'] / self.m2_depth['buy_one']['price'] > self.m1_sell_ratio
+
+    def exe(self):
+        amount = self.m1_depth['buy_one']['amount']
+        amount = self.adjust_amount(amount)
+        order_id = self.m2.buy(self.m2_depth['buy_one']['price']+self.skip_price, amount)
+        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m1_depth['buy_one']['price'], 'action':'sell'}})    
+
+

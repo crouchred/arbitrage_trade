@@ -3,6 +3,7 @@ from strategy import Strategy
 from market import Binance, Bibox
 from utils.logger import Logger
 logger = Logger.get_logger("app")
+import traceback
 
 class Client:
 
@@ -13,7 +14,11 @@ class Client:
             if i % 100 == 0:
                 self.refresh_redis()
                 logger.info("%s times to run"%(i))
-            self.run_strategy()
+            try:
+                self.run_strategy()
+            except Exception:
+                logger.info("the %s times fail"%(i))
+                traceback.print_exc()                
             time.sleep(5)
             i += 1
 
