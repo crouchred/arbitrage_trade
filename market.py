@@ -60,6 +60,9 @@ class Market:
     def _get_week_prices(self):
         raise NotImplementedError('')
 
+    def get_order_detail(self):
+        raise NotImplementedError('')
+
     def get_average_price(self):
         closes = self._get_week_prices()
         return sum(closes) / len(closes)
@@ -71,6 +74,7 @@ class Market:
     def get_low_price(self):
         closes = self._get_week_prices()
         return min(closes)
+
 
     def clear_open_orders(self):
         orders = [o['order_id'] for o in self.get_open_orders()]
@@ -91,6 +95,18 @@ class Binance(Market):
 
     def get_fee(self):
         return 0.0005
+
+    def get_order_detail(self, order_id):
+        order = self.client.get_order(
+            symbol=self.trade_pair,
+            orderId=order_id)
+        return {'order_id': order_id,
+                'side': order['side'],
+                'price': float(order['price']),
+                'time': order['time'],
+                'amount': float(order['origQty']),
+                'deal_amount': float(order['executedQty'])
+                }
 
     def get_balance(self):
         result = self.client.get_asset_balance(asset=self.basecoin)
@@ -160,7 +176,7 @@ class Binance(Market):
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
     def _get_week_prices(self):
-        data = self.client.get_klines(symbol=self.trade_pair, interval=Client.KLINE_INTERVAL_1HOUR)[-168:-1]
+        data = self.client.get_klines(symbol=self.trade_pair, interval=Client.KLINE_INTERVAL_1HOUR)[-72:-1]
         closes = [float(i[4]) for i in data]
         return closes
 
@@ -208,6 +224,26 @@ class Bibox(Market):
         ]
         data = self.__doApiRequestWithApikey(url,cmds)
         return data
+
+    def get_order_detail(self, order_id):
+        url = "https://api.bibox.com/v1/orderpending"
+        cmds = [
+                {
+                    'cmd': 'orderpending/order',
+                    'body': {
+                        'id': order_id
+                        }
+                    }
+                ]
+        order =  self.__doApiRequestWithApikey(url,cmds)
+        return {
+                'order_id': order_id,
+                'amount': order['amount'],
+                'deal_amount': order['deal_amount'],
+                'side': 'BUY' if order['order_side']==1 else 'SELL',
+                'time': order['createdAt'],
+                'price': order['price']
+                }
 
     def buy(self, price, amount):
         order_id = self.__post_order(1, price, amount)
@@ -308,9 +344,13 @@ class Bibox(Market):
 
     def _get_week_prices(self):
         """过去一周的每小时close价格"""
-        url = "https://api.bibox.com/v1/mdata?cmd=kline&pair={trade_pair}&period=1hour&size=168" \
+        url = "https://api.bibox.com/v1/mdata?cmd=kline&pair={trade_pair}&period=1hour&size=72" \
                 .format(trade_pair=self.trade_pair)
-        r = requests.get(url, proxies=proxies)
+        for _ in range(3):
+            r = requests.get(url, proxies=proxies)
+            if r.text != '':
+                break
+                time.sleep(2)
         data = json.loads(r.text)
         closes = [float(i['close']) for i in data['result']]
         return closes
@@ -338,15 +378,21 @@ class Bibox(Market):
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')
+    print(bibox.get_order_detail(587083712))
+#    print(bibox.get_average_price())
 #    print(bibox.get_depth())
-    print(bibox.get_balance())
+#    print(bibox.get_balance())
+#    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())
 #
     print("bibox<------->binance")
     binance = Binance('EOS', 'BTC')
+#    print(binance.get_order_detail(56126001))
+#    print(binance.get_average_price())
 #    print(binance.get_depth())
-    print(binance.get_balance())
+#    print(binance.get_balance())
+#    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
 #    print(binance.clear_open_orders())
 #

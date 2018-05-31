@@ -10,9 +10,9 @@ class Client:
         logger.info("start running")
         i = 0 
         while True:
-            logger.info("%s times to run"%(i))
             if i % 100 == 0:
                 self.refresh_redis()
+                logger.info("%s times to run"%(i))
             self.run_strategy()
             time.sleep(5)
             i += 1
