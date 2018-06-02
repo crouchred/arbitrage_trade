@@ -3,6 +3,7 @@ from binance.client import Client
 import hmac
 import hashlib
 import json, requests
+import traceback
 
 from config import *
 from utils.logger import Logger
@@ -100,7 +101,7 @@ class Binance(Market):
         order = self.client.get_order(
             symbol=self.trade_pair,
             orderId=order_id)
-        return {'order_id': order_id,
+        return {'order_id': float(order_id),
                 'side': order['side'],
                 'price': float(order['price']),
                 'time': order['time'],
@@ -146,7 +147,7 @@ class Binance(Market):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
         order_id = order['orderId']
-        logger.info("[binance][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        logger.info("-->[binance][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
         return order_id
 
     def sell(self, price, amount):
@@ -199,7 +200,10 @@ class Bibox(Market):
         sign = self.__getSign(s_cmds, bibox_secret_key)
         r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
                 proxies=proxies)
-        return json.loads(r.text)['result'][0]['result']
+        try:
+            return json.loads(r.text)['result'][0]['result']
+        except Exception:
+            traceback.print_exc()
 
     def __post_order(self, order_side, price, amount, order_type=2):
         """
@@ -237,22 +241,22 @@ class Bibox(Market):
                 ]
         order =  self.__doApiRequestWithApikey(url,cmds)
         return {
-                'order_id': order_id,
-                'amount': order['amount'],
-                'deal_amount': order['deal_amount'],
+                'order_id': float(order_id),
+                'amount': float(order['amount']),
+                'deal_amount': float(order['deal_amount']),
                 'side': 'BUY' if order['order_side']==1 else 'SELL',
                 'time': order['createdAt'],
-                'price': order['price']
+                'price': float(order['price'])
                 }
 
     def buy(self, price, amount):
         order_id = self.__post_order(1, price, amount)
-        logger.info("[bibox][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        logger.info("-->[bibox][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
         return order_id
 
     def sell(self, price, amount):
         order_id = self.__post_order(2, price, amount)
-        logger.info("[bibox][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
+        logger.info("-->[bibox][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
         return order_id
 
     def cancel_order(self, order_id):
@@ -266,7 +270,7 @@ class Bibox(Market):
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
-        logger.info("[bibox][cancel][%s][order:%s]"%(self.trade_pair, order_id))
+        logger.info("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, order_id))
         return 0
 
     def get_open_orders(self):
@@ -378,10 +382,10 @@ class Bibox(Market):
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')
-#    print(bibox.get_order_detail(587083712))
+    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
-    print(bibox.get_balance())
+#    print(bibox.get_balance())
 #    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())

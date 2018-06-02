@@ -1,5 +1,6 @@
 import redis
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+import json
 
 class Strategy:
 
@@ -8,7 +9,6 @@ class Strategy:
         self.m2 = m2
         self.min_amount = min_amount # 限制于交易所
         self.max_amount = max_amount # 限制于胆子小
-        self.skip_price = 0.0001
     
     def get_profit_ratio(self, side='BUY'):
         """根据仓位确定需要的盈利率系数"""
@@ -43,11 +43,12 @@ class Strategy:
         m1_buy_ratio = self.get_fee_total() * self.m1.get_profit_ratio('BUY') - bias + 1 
         m1_sell_ratio = self.get_fee_total() * self.m1.get_profit_ratio('SELL') + bias + 1
     
-        StrategyPlanClassList = [StrategyPlan1, StrategyPlan2]
+        #StrategyPlanClassList = [StrategyPlan1, StrategyPlan2]
+        StrategyPlanClassList = [StrategyPlan4, StrategyPlan6]
         for StrategyPlanClass in StrategyPlanClassList:
             strategy = StrategyPlanClass(m1=self.m1, m2=self.m2, m1_depth=m1_depth, m2_depth=m2_depth, \
                     m1_buy_ratio=m1_buy_ratio, m1_sell_ratio=m1_sell_ratio, max_amount=self.max_amount, \
-                    bias=bias)
+                    min_amount=self.min_amount, bias=bias)
             strategy.previous_exe()
             if strategy.do_exe and strategy.check():
                 strategy.exe()
@@ -63,35 +64,36 @@ class StrategyPlan:
         self.m1_buy_ratio = kw['m1_buy_ratio']
         self.m1_sell_ratio = kw['m1_sell_ratio']
         self.max_amount = kw['max_amount']
+        self.min_amount = kw['max_amount']
         self.bias = kw['bias']
         self.do_exe = True
+        self.skip_price = 0.0000001
 
     def previous_exe(self):
-        order_in_redis = r.get(self.name)
-        order_id = order_in_redis['order_id']
+        try:
+            order_in_redis = json.loads(r.get(self.name))
+            r.delete(self.name)
+        except Exception:
+            return 
+        order_id = int(order_in_redis['order_id'])
         if order_id is None:
             return
-        order =  self.origin_market.order_detail(order_id)
-        if order['deal_amount'] == 0:
-            if self.check():
-                self.do_exe = False
-            else:
-                self.origin_market.cancel_order(order_id)
+        order =  self.origin_market.get_order_detail(order_id)
+        
+        if order['deal_amount'] < self.min_amount: # 成交金额太小也没法对冲
+            self.origin_market.cancel_order(order_id)
         else:
             if order['deal_amount'] != order['amount']: # 未完成订单
                 self.origin_market.cancel_order(order_id)
             hedge_order_id = self.hedge_market.__getattribute__(\
                     order_in_redis['hedge']['action'])(order_in_redis['hedge']['price'], \
-                    min(order['deal_amount'], self.min_amount))
+                    self.adjust_amount(order['deal_amount']))
             r.sadd('hedge_order_ids', hedge_order_id)    
 
-    def adjust_amount(self, amount):
+    def adjust_amount(self, amount): # 这里限制最小也没有意义了
         amount = min(amount, self.max_amount)
-        amount = int(amount*10) / 10
+        amount = int(amount*100) / 100
         return amount
-
-    def previous_exe(self):
-        pass
 
     def check(self):
         raise NotImplementedError('')
@@ -100,6 +102,9 @@ class StrategyPlan:
         raise NotImplementedError('')
 
 class StrategyPlan1(StrategyPlan):
+
+    def previous_exe(self):
+        pass
 
     def check(self):
         """m1的买单>m2的卖单"""
@@ -113,6 +118,9 @@ class StrategyPlan1(StrategyPlan):
         self.m2.buy(self.m2_depth['sell_one']['price'], amount)
 
 class StrategyPlan2(StrategyPlan):
+
+    def previous_exe(self):
+        pass
 
     def check(self):
         """m2的买单>m1的卖单"""
@@ -140,7 +148,8 @@ class StrategyPlan3(StrategyPlan):
         amount = self.m2_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m1.sell(self.m1_depth['sell_one']['price']-self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'sell'}})    
+        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'sell'}}
+        r.set(self.name, json.dumps(content))    
 
 class StrategyPlan4(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -157,7 +166,8 @@ class StrategyPlan4(StrategyPlan):
         amount = self.m1_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m2.sell(self.m2_depth['sell_one']['price']-self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'sell'}})    
+        content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'sell'}}
+        r.set(self.name, json.dumps(content))    
 
 class StrategyPlan5(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -174,7 +184,8 @@ class StrategyPlan5(StrategyPlan):
         amount = self.m2_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m1.buy(self.m1_depth['buy_one']['price']+self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'buy'}})    
+        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'buy'}}
+        r.set(self.name, json.dumps(content))    
 
 class StrategyPlan6(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -191,6 +202,7 @@ class StrategyPlan6(StrategyPlan):
         amount = self.m1_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
         order_id = self.m2.buy(self.m2_depth['buy_one']['price']+self.skip_price, amount)
-        r.set(self.name, {'order_id':'order_id', 'hedge':{'price': self.m1_depth['buy_one']['price'], 'action':'sell'}})    
+        content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['buy_one']['price'], 'action':'sell'}}
+        r.set(self.name, json.dumps(content))    
 
 
