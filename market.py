@@ -112,7 +112,7 @@ class Market:
         return 0 
 
 class Binance(Market):
-    def __init__(self, product, basecoin):
+    def __init__(self, product="", basecoin=""):
         super().__init__(product, basecoin)
         self.client = Client(binance_api_key, binance_secret_key, {'proxies': proxies})
         self.trade_pair = self.product + self.basecoin
@@ -132,6 +132,14 @@ class Binance(Market):
                 'amount': float(order['origQty']),
                 'deal_amount': float(order['executedQty'])
                 }
+
+    def get_balance_all(self, coins):
+        result = []
+        for coin in coins:
+            tmp = self.client.get_asset_balance(asset=coin)
+            if tmp is not None:
+                result.append({'market':'binance', 'coin': coin, 'amount': float(tmp['free']) + float(tmp['locked'])})
+        return result
 
     def get_balance(self):
         result = self.client.get_asset_balance(asset=self.basecoin)
@@ -209,7 +217,7 @@ class Binance(Market):
         return closes
 
 class Bibox(Market):
-    def __init__(self, product, basecoin):
+    def __init__(self, product="", basecoin=""):
         super().__init__(product, basecoin)
         self.trade_pair = self.product + "_" + self.basecoin
         self.uri = "https://api.bibox.com/v1"
@@ -217,6 +225,7 @@ class Bibox(Market):
 
     def get_fee(self):
         return 0.0005
+
 
     def __getSign(self, data,secret):
         result = hmac.new(secret.encode("utf-8"), data.encode("utf-8"), hashlib.md5).hexdigest()
@@ -330,6 +339,23 @@ class Bibox(Market):
                 'deal_amount': float(order['deal_amount'])
                 })
         return result 
+
+    def get_balance_all(self, coins):
+        url = "https://api.bibox.com/v1/transfer"
+        cmds = [
+                {
+                    'cmd': 'transfer/assets',
+                    'body': {
+                        'select': 1
+                        }
+                    }
+                ]
+        data =  self.__doApiRequestWithApikey(url,cmds)
+        result = []
+        for asset in data['assets_list']:
+            if asset['coin_symbol'] in coins:
+                result.append({'market': 'bibox', 'coin': asset['coin_symbol'], 'amount': float(asset['balance'])})
+        return result
 
     def get_balance(self):
         url = "https://api.bibox.com/v1/transfer"

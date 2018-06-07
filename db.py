@@ -42,7 +42,7 @@ class Mysql:
         engine = create_engine("mysql+pymysql://root:root@localhost:3306/arbitrage_trade?charset=utf8")
         self.DBSession = sessionmaker(bind=engine)
 
-    def insert_balance(self, balances_list, date):
+    def insert_balance(self, balance_list, date):
         session = self.DBSession()
         query = session.query(Balance)
         query_result = query.filter(Balance.date==date)
