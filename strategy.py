@@ -69,6 +69,20 @@ class StrategyPlan:
         self.do_exe = True
         self.skip_price = 0.0000001
 
+    def get_level(self):
+        # 返回订单级别, high定义为大概率马上执行的订单
+        classname = self.__class__.__name__ 
+        if classname in ('StrategyPlan1', 'StrategyPlan2'):
+            return 'high'
+        else 
+            return 'low'
+
+    def get_planname(self):
+        # 返回类似plan1, plan2的形式
+        classname = self.__class__.__name__ 
+        return classname.replace('Strategy', '').lower()
+        
+
     def previous_exe(self):
         try:
             order_in_redis = json.loads(r.get(self.name))
@@ -113,9 +127,8 @@ class StrategyPlan1(StrategyPlan):
     def exe(self):
         amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
         amount = self.adjust_amount(amount)
-        print("bias: %s"%(self.bias))
-        self.m1.sell(self.m1_depth['buy_one']['price'], amount)
-        self.m2.buy(self.m2_depth['sell_one']['price'], amount)
+        self.m1.sell(self.m1_depth['buy_one']['price'], amount, self.get_planname(), self.get_level(), 0)
+        self.m2.buy(self.m2_depth['sell_one']['price'], amount, self.get_planname(), self.get_level(), 0)
 
 class StrategyPlan2(StrategyPlan):
 
@@ -130,8 +143,8 @@ class StrategyPlan2(StrategyPlan):
         amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
         amount = self.adjust_amount(amount)
         print("bias: %s"%(self.bias))
-        self.m1.buy(self.m1_depth['sell_one']['price'], amount)
-        self.m2.sell(self.m2_depth['buy_one']['price'], amount)
+        self.m1.buy(self.m1_depth['sell_one']['price'], amount, self.get_planname(), self.get_level(), 0)
+        self.m2.sell(self.m2_depth['buy_one']['price'], amount, self.get_planname(), self.get_level(), 0)
 
 class StrategyPlan3(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -147,7 +160,7 @@ class StrategyPlan3(StrategyPlan):
     def exe(self):
         amount = self.m2_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
-        order_id = self.m1.sell(self.m1_depth['sell_one']['price']-self.skip_price, amount)
+        order_id = self.m1.sell(self.m1_depth['sell_one']['price']-self.skip_price, amount, self.get_planname(), self.get_level(), 0)
         content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'sell'}}
         r.set(self.name, json.dumps(content))    
 
@@ -165,7 +178,7 @@ class StrategyPlan4(StrategyPlan):
     def exe(self):
         amount = self.m1_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
-        order_id = self.m2.sell(self.m2_depth['sell_one']['price']-self.skip_price, amount)
+        order_id = self.m2.sell(self.m2_depth['sell_one']['price']-self.skip_price, amount, self.get_planname(), self.get_level(), 0)
         content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'sell'}}
         r.set(self.name, json.dumps(content))    
 
@@ -183,7 +196,7 @@ class StrategyPlan5(StrategyPlan):
     def exe(self):
         amount = self.m2_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
-        order_id = self.m1.buy(self.m1_depth['buy_one']['price']+self.skip_price, amount)
+        order_id = self.m1.buy(self.m1_depth['buy_one']['price']+self.skip_price, amount, self.get_planname(), self.get_level(), 0)
         content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'buy'}}
         r.set(self.name, json.dumps(content))    
 
@@ -201,7 +214,7 @@ class StrategyPlan6(StrategyPlan):
     def exe(self):
         amount = self.m1_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
-        order_id = self.m2.buy(self.m2_depth['buy_one']['price']+self.skip_price, amount)
+        order_id = self.m2.buy(self.m2_depth['buy_one']['price']+self.skip_price, amount, self.get_planname(), self.get_level(), 0)
         content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['buy_one']['price'], 'action':'sell'}}
         r.set(self.name, json.dumps(content))    
 

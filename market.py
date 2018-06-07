@@ -9,12 +9,23 @@ from config import *
 from utils.logger import Logger
 logger = Logger.get_logger("market")
 
+from db import Mysql, Trade
+db = Mysql()
+
 class Market:
 
     def __init__(self, product, basecoin):
         self.product = product.upper()
         self.basecoin = basecoin.upper()
         self.feecoin = ""
+
+    @property
+    def market_name(self):
+        return self.__class__.__name__.lower()
+
+    @property
+    def standard_pair(self):
+        return self.product + "_" + self.basecoin
 
     def get_profit_ratio(self, side='BUY'):
         """根据仓位确定需要的盈利率系数"""
@@ -36,14 +47,21 @@ class Market:
         """product的仓位"""
         raise NotImplementedError('')
 
-    def buy(self):
-        raise NotImplementedError('')
+    def buy(self, price, amount, plan, level, is_hedge, orderid=None):
+        trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
+                pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
+                price=price, amount=amount)
+        db.upsert_trade(trade)
 
-    def sell(self):
-        raise NotImplementedError('')
+    def sell(self, price, amount, plan, level, is_hedge, orderid=None):
+        trade = Trade(orderid=orderid, market=self.market_name, side='SELL', \
+                pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
+                price=price, amount=amount)
+        db.upsert_trade(trade)
 
-    def cancel_order(self):
-        raise NotImplementedError('')
+    def cancel_order(self, orderid):
+        trade = Trade(orderid=orderid, deal_amount=0)
+        db.upsert_trade(trade, columns_change =['deal_amount'])
 
     def get_depth(self):
         """ return 
@@ -78,12 +96,12 @@ class Market:
 
 
     def clear_open_orders(self):
-        orders = [o['order_id'] for o in self.get_open_orders()]
+        orders = [o['orderid'] for o in self.get_open_orders()]
         logger.info("orders before clear: %s"%(orders))
         for order in orders:
             self.cancel_order(order)
 
-        orders = [o['order_id'] for o in self.get_open_orders()]
+        orders = [o['orderid'] for o in self.get_open_orders()]
         logger.info("orders after clear: %s"%(orders))
         return 0 
 
@@ -97,11 +115,11 @@ class Binance(Market):
     def get_fee(self):
         return 0.0005
 
-    def get_order_detail(self, order_id):
+    def get_order_detail(self, orderid):
         order = self.client.get_order(
             symbol=self.trade_pair,
-            orderId=order_id)
-        return {'order_id': float(order_id),
+            orderId=orderid)
+        return {'orderid': float(orderid),
                 'side': order['side'],
                 'price': float(order['price']),
                 'time': order['time'],
@@ -134,7 +152,7 @@ class Binance(Market):
         result = []
         for order in orders:
             result.append({
-                    'order_id': order['orderId'],
+                    'orderid': order['orderId'],
                     'side': order['side'],
                     'price': float(order['price']),
                     'time': order['time'],
@@ -143,27 +161,30 @@ class Binance(Market):
                     })
         return result
 
-    def buy(self, price, amount):
+    def buy(self, price, amount, plan, level, is_hedge):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
-        order_id = order['orderId']
-        logger.info("-->[binance][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
-        return order_id
+        orderid = order['orderId']
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        return orderid
 
-    def sell(self, price, amount):
+    def sell(self, price, amount, plan, level, is_hedge):
+        order = self.client.order_limit_buy(symbol=self.trade_pair, \
+            quantity=amount, price=price)
         order = self.client.order_limit_sell(
             symbol=self.trade_pair,
             quantity=amount,
             price=price)
-        order_id = order['orderId']
-        logger.info("-->[binance][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
-        return order_id
+        orderid = order['orderId']
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        return orderid
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, orderid):
         result = self.client.cancel_order(
             symbol=self.trade_pair,
-            orderId=order_id)
-        logger.info("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, order_id))
+            orderId=orderid)
+        logger.info("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        super().cancel_order(orderid=orderid)
         return 0
 
     def get_depth(self, min_amount=0):
@@ -229,19 +250,19 @@ class Bibox(Market):
         data = self.__doApiRequestWithApikey(url,cmds)
         return data
 
-    def get_order_detail(self, order_id):
+    def get_order_detail(self, orderid):
         url = "https://api.bibox.com/v1/orderpending"
         cmds = [
                 {
                     'cmd': 'orderpending/order',
                     'body': {
-                        'id': order_id
+                        'id': orderid
                         }
                     }
                 ]
         order =  self.__doApiRequestWithApikey(url,cmds)
         return {
-                'order_id': float(order_id),
+                'orderid': float(orderid),
                 'amount': float(order['amount']),
                 'deal_amount': float(order['deal_amount']),
                 'side': 'BUY' if order['order_side']==1 else 'SELL',
@@ -249,28 +270,29 @@ class Bibox(Market):
                 'price': float(order['price'])
                 }
 
-    def buy(self, price, amount):
-        order_id = self.__post_order(1, price, amount)
-        logger.info("-->[bibox][order:%s][limit][buy][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
-        return order_id
+    def buy(self, price, amount, plan, level, is_hedge):
+        orderid = self.__post_order(1, price, amount)
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        return orderid
 
-    def sell(self, price, amount):
-        order_id = self.__post_order(2, price, amount)
-        logger.info("-->[bibox][order:%s][limit][sell][%s][price:%s][amount:%s]"%(order_id, self.trade_pair, price, amount))
-        return order_id
+    def sell(self, price, amount, plan, level, is_hedge):
+        orderid = self.__post_order(2, price, amount)
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        return orderid
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, orderid):
         url = "https://api.bibox.com/v1/orderpending"
         cmds = [
                 {
                     'cmd': 'orderpending/cancelTrade',
                     'body': {
-                        'orders_id': order_id
+                        'orders_id': orderid
                         }
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
-        logger.info("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, order_id))
+        logger.info("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        super().cancel_order(orderid=orderid)
         return 0
 
     def get_open_orders(self):
@@ -294,7 +316,7 @@ class Bibox(Market):
         result = []
         for order in orders:
             result.append({
-                'order_id': order['id'],
+                'orderid': order['id'],
                 'side': 'BUY' if order['order_side']==1 else 'SELL',
                 'price': float(order['price']),
                 'time': order['createdAt'],
@@ -381,8 +403,8 @@ class Bibox(Market):
 
 
 if __name__=="__main__":
-    bibox = Bibox('EOS', 'BTC')
-    print(bibox.get_order_detail(594940813))
+#    bibox = Bibox('EOS', 'BTC')
+#    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
 #    print(bibox.get_balance())
@@ -392,7 +414,7 @@ if __name__=="__main__":
 #
     print("bibox<------->binance")
     binance = Binance('EOS', 'BTC')
-#    print(binance.get_order_detail(56126001))
+    print(binance.get_order_detail(56126001))
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
     print(binance.get_balance())

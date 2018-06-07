@@ -32,20 +32,20 @@ class TestMarketBaseMixin():
 
         low = self.client.get_low_price()
         print("low price: %s"%(low))
-        order_id =  self.client.buy(low, self.min_amount)
-        orders = [o['order_id'] for o in self.client.get_open_orders()]
-        self.assertTrue(order_id in orders)
-        order_id =  self.client.cancel_order(order_id)
-        self.assertFalse(order_id in orders)
+        orderid =  self.client.buy(low, self.min_amount, 'test', 'low', 0)
+        orders = [o['orderid'] for o in self.client.get_open_orders()]
+        self.assertTrue(orderid in orders)
+        orderid =  self.client.cancel_order(orderid)
+        self.assertFalse(orderid in orders)
 
     def test_sell(self):
         high = self.client.get_high_price()
         print("high price: %s"%(high))
-        order_id =  self.client.sell(high, self.min_amount)
-        orders = [o['order_id'] for o in self.client.get_open_orders()]
-        self.assertTrue(order_id in orders)
-        order_id =  self.client.cancel_order(order_id)
-        self.assertFalse(order_id in orders)
+        orderid =  self.client.sell(high, self.min_amount, 'test', 'low', 0)
+        orders = [o['orderid'] for o in self.client.get_open_orders()]
+        self.assertTrue(orderid in orders)
+        orderid =  self.client.cancel_order(orderid)
+        self.assertFalse(orderid in orders)
 
     def test_depth(self):
         depth = self.client.get_depth(min_amount=self.min_amount)
