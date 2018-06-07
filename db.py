@@ -6,6 +6,9 @@ import datetime
 
 Base = declarative_base()
 
+from utils.logger import Logger
+logger = Logger.get_logger("db")
+
 class Balance(Base):
 
     __tablename__ = 'balance'
@@ -59,6 +62,13 @@ class Mysql:
         query_result = query.filter(Trade.orderid==trade.orderid)
         if query_result.first() is None:
             session.add(trade)
+            if trade.level == 'low':
+                logger.debug("-->[%s][order:%s][limit][%s][%s][price:%s][amount:%s]"%( \
+                        trade.market, trade.orderid, trade.side, trade.pair, trade.price, trade.amount))
+            else:
+                logger.info("-->[%s][order:%s][limit][%s][%s][price:%s][amount:%s]"%( \
+                        trade.market, trade.orderid, trade.side, trade.pair, trade.price, trade.amount))
+
         else:
             columns_update = Trade.__table__.columns.keys()
             if columns_change != []:
@@ -70,11 +80,3 @@ class Mysql:
         session.commit()
         session.close()
 
-
-balance = Balance(coin='test', amount=1, market='ma')
-balance_list = [balance]
-db = Mysql()
-db.insert_balance(balance_list, date='2018-06-01')
-
-trade = Trade(orderid=12345, price=2)
-db.upsert_trade(trade, columns_not_change=['amount'])

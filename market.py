@@ -183,7 +183,7 @@ class Binance(Market):
         result = self.client.cancel_order(
             symbol=self.trade_pair,
             orderId=orderid)
-        logger.info("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        logger.debug("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, orderid))
         super().cancel_order(orderid=orderid)
         return 0
 
@@ -291,7 +291,7 @@ class Bibox(Market):
                     }
                 ]
         data =  self.__doApiRequestWithApikey(url,cmds)
-        logger.info("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        logger.debug("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, orderid))
         super().cancel_order(orderid=orderid)
         return 0
 
