@@ -12,6 +12,12 @@ logger = Logger.get_logger("market")
 from db import Mysql, Trade
 db = Mysql()
 
+def market_factory(name):
+    if name.lower() == 'binance':
+        return Binance
+    elif name.lower() == 'bibox':
+        return Bibox
+
 class Market:
 
     def __init__(self, product, basecoin):
@@ -21,7 +27,7 @@ class Market:
 
     @property
     def market_name(self):
-        return self.__class__.__name__.lower()
+        return self.__class__.__name__
 
     @property
     def standard_pair(self):
@@ -403,22 +409,22 @@ class Bibox(Market):
 
 
 if __name__=="__main__":
-#    bibox = Bibox('EOS', 'BTC')
+    bibox = Bibox('EOS', 'BTC')
 #    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
-#    print(bibox.get_balance())
-#    print(bibox.get_balance_position())
+    print(bibox.get_balance())
+    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())
 #
     print("bibox<------->binance")
     binance = Binance('EOS', 'BTC')
-    print(binance.get_order_detail(56126001))
+#    print(binance.get_order_detail(56126001))
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
     print(binance.get_balance())
-#    print(binance.get_balance_position())
+    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
 #    print(binance.clear_open_orders())
 #

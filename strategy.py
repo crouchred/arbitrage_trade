@@ -43,8 +43,7 @@ class Strategy:
         m1_buy_ratio = self.get_fee_total() * self.m1.get_profit_ratio('BUY') - bias + 1 
         m1_sell_ratio = self.get_fee_total() * self.m1.get_profit_ratio('SELL') + bias + 1
     
-        #StrategyPlanClassList = [StrategyPlan1, StrategyPlan2]
-        StrategyPlanClassList = [StrategyPlan4, StrategyPlan6]
+        StrategyPlanClassList = [StrategyPlan1, StrategyPlan2, StrategyPlan3, StrategyPlan4, StrategyPlan5, StrategyPlan6]
         for StrategyPlanClass in StrategyPlanClassList:
             strategy = StrategyPlanClass(m1=self.m1, m2=self.m2, m1_depth=m1_depth, m2_depth=m2_depth, \
                     m1_buy_ratio=m1_buy_ratio, m1_sell_ratio=m1_sell_ratio, max_amount=self.max_amount, \
@@ -74,7 +73,7 @@ class StrategyPlan:
         classname = self.__class__.__name__ 
         if classname in ('StrategyPlan1', 'StrategyPlan2'):
             return 'high'
-        else 
+        else:
             return 'low'
 
     def get_planname(self):
@@ -101,8 +100,7 @@ class StrategyPlan:
                 self.origin_market.cancel_order(order_id)
             hedge_order_id = self.hedge_market.__getattribute__(\
                     order_in_redis['hedge']['action'])(order_in_redis['hedge']['price'], \
-                    self.adjust_amount(order['deal_amount']))
-            r.sadd('hedge_order_ids', hedge_order_id)    
+                    self.adjust_amount(order['deal_amount']), self.get_planname(), 'high', 1)
 
     def adjust_amount(self, amount): # 这里限制最小也没有意义了
         amount = min(amount, self.max_amount)
