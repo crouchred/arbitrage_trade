@@ -12,6 +12,10 @@ logger = Logger.get_logger("market")
 from db import Mysql, Trade
 db = Mysql()
 
+import redis
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+ex=10
+
 def market_factory(name):
     if name.lower() == 'binance':
         return Binance
@@ -52,6 +56,14 @@ class Market:
     def get_balance_position(self):
         """product的仓位"""
         raise NotImplementedError('')
+
+    def buy_check(self, price, amount):
+        basecoin_amount = self.get_balance()['basecoin']
+        return basecoin_amount > price * amount
+
+    def sell_check(self, price, amount):
+        product_amount = self.get_balance()['product']
+        return product_amount > amount
 
     def buy(self, price, amount, plan, level, is_hedge, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
@@ -142,15 +154,28 @@ class Binance(Market):
         return result
 
     def get_balance(self):
+        binance_balance = r.get("binance_balance")
+        if binance_balance:
+            return json.loads(binance_balance)
+        logger.debug("binance balance expire")
+
         result = self.client.get_asset_balance(asset=self.basecoin)
         basecoin_amount = float(result['free']) + float(result['locked'])
         result = self.client.get_asset_balance(asset=self.product)
         product_amount = float(result['free']) + float(result['locked'])
         result = self.client.get_asset_balance(asset=self.feecoin)
         feecoin_amount = float(result['free']) + float(result['locked'])
-        return {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
+
+        result = {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
+        r.set("binance_balance", json.dumps('result'), ex=ex)
+        return result
 
     def get_balance_position(self):
+        binance_balance_position = r.get("binance_balance_position")
+        if binance_balance_position:
+            return float(binance_balance_position)
+        logger.debug("binance balance position expire")
+
         result = self.client.get_asset_balance(asset=self.basecoin)
         basecoin_amount = float(result['free']) + float(result['locked'])
         result = self.client.get_asset_balance(asset=self.product)
@@ -159,7 +184,9 @@ class Binance(Market):
         depth = self.get_depth()
         price = (depth['buy_one']['price'] + depth['sell_one']['price'])/2
 
-        return product_amount*price / (product_amount*price+basecoin_amount)
+        result = product_amount*price / (product_amount*price+basecoin_amount)
+        r.set("binance_balance_position", result, ex=ex)
+        return result
 
     def get_open_orders(self):
         orders = self.client.get_open_orders(symbol=self.trade_pair)
@@ -358,6 +385,12 @@ class Bibox(Market):
         return result
 
     def get_balance(self):
+
+        bibox_balance= r.get("bibox_balance")
+        if bibox_balance:
+            return json.loads(bibox_balance)
+        logger.debug("bibox balance expire")
+
         url = "https://api.bibox.com/v1/transfer"
         cmds = [
                 {
@@ -375,9 +408,16 @@ class Bibox(Market):
                 product_amount = float(asset['balance'])
             elif asset['coin_symbol'] == self.feecoin:
                 feecoin_amount = float(asset['balance'])
-        return {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
+        result = {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
+        r.set("bibox_balance", json.dumps(result), ex=ex)
+        return result
 
     def get_balance_position(self):
+        bibox_balance_position = r.get("bibox_balance_position")
+        if bibox_balance_position:
+            return float(bibox_balance_position)
+        logger.debug("bibox balance position expire")
+
         url = "https://api.bibox.com/v1/transfer"
         cmds = [
                 {
@@ -398,7 +438,9 @@ class Bibox(Market):
             elif asset['coin_symbol'] == self.product:
                 product_balance = float(asset['CNYValue'])
 
-        return product_balance / (product_balance + basecoin_balance)
+        result = product_balance / (product_balance + basecoin_balance)
+        r.set("bibox_balance_position", result, ex=ex)
+        return result
 
     def _get_week_prices(self):
         """过去一周的每小时close价格"""
@@ -432,7 +474,6 @@ class Bibox(Market):
         sell_one.pop('volume')
 
         return {'buy_one': buy_one, 'sell_one': sell_one}
-
 
 if __name__=="__main__":
     bibox = Bibox('EOS', 'BTC')

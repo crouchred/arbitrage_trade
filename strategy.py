@@ -9,7 +9,7 @@ class Strategy:
         self.m2 = m2
         self.min_amount = min_amount # 限制于交易所
         self.max_amount = max_amount # 限制于胆子小
-    
+
     def get_profit_ratio(self, side='BUY'):
         """根据仓位确定需要的盈利率系数"""
         m1_balance_position = self.m1.get_balance_position()
@@ -125,8 +125,14 @@ class StrategyPlan1(StrategyPlan):
     def exe(self):
         amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
         amount = self.adjust_amount(amount)
-        self.m1.sell(self.m1_depth['buy_one']['price'], amount, self.get_planname(), self.get_level(), 0)
-        self.m2.buy(self.m2_depth['sell_one']['price'], amount, self.get_planname(), self.get_level(), 0)
+        sell_price = self.m1_depth['buy_one']['price']
+        buy_price = self.m2_depth['sell_one']['price']
+
+        if not (self.m1.sell_check(sell_price, amount) and self.m2.buy_check(buy_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return 
+        self.m1.sell(sell_price, amount, self.get_planname(), self.get_level(), 0)
+        self.m2.buy(buy_price, amount, self.get_planname(), self.get_level(), 0)
 
 class StrategyPlan2(StrategyPlan):
 
@@ -140,9 +146,15 @@ class StrategyPlan2(StrategyPlan):
     def exe(self):
         amount = min(self.m1_depth['buy_one']['amount'], self.m2_depth['sell_one']['amount'])
         amount = self.adjust_amount(amount)
-        print("bias: %s"%(self.bias))
-        self.m1.buy(self.m1_depth['sell_one']['price'], amount, self.get_planname(), self.get_level(), 0)
-        self.m2.sell(self.m2_depth['buy_one']['price'], amount, self.get_planname(), self.get_level(), 0)
+
+        buy_price = self.m1_depth['sell_one']['price']
+        sell_price = self.m2_depth['buy_one']['price']
+
+        if not (self.m1.buy_check(buy_price, amount) and self.m2.sell_check(sell_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return 
+        self.m1.buy(buy_price, amount, self.get_planname(), self.get_level(), 0)
+        self.m2.sell(sell_price, amount, self.get_planname(), self.get_level(), 0)
 
 class StrategyPlan3(StrategyPlan):
     def __init__(self, *a, **kw):
@@ -158,8 +170,15 @@ class StrategyPlan3(StrategyPlan):
     def exe(self):
         amount = self.m2_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
+        buy_price = self.m2_depth['sell_one']['price']
+        sell_price = self.m1_depth['sell_one']['price']-self.skip_price
+
+        if not (self.m1.sell_check(sell_price, amount) and self.m2.buy_check(buy_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return
+
         order_id = self.m1.sell(self.m1_depth['sell_one']['price']-self.skip_price, amount, self.get_planname(), self.get_level(), 0)
-        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'sell'}}
+        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['sell_one']['price'], 'action':'buy'}}
         r.set(self.name, json.dumps(content))    
 
 class StrategyPlan4(StrategyPlan):
@@ -176,8 +195,16 @@ class StrategyPlan4(StrategyPlan):
     def exe(self):
         amount = self.m1_depth['sell_one']['amount']
         amount = self.adjust_amount(amount)
+
+        buy_price = self.m1_depth['sell_one']['price']
+        sell_price = self.m2_depth['sell_one']['price']-self.skip_price
+
+        if not (self.m1.buy_check(buy_price, amount) and self.m2.sell_check(sell_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return
+
         order_id = self.m2.sell(self.m2_depth['sell_one']['price']-self.skip_price, amount, self.get_planname(), self.get_level(), 0)
-        content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'sell'}}
+        content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['sell_one']['price'], 'action':'buy'}}
         r.set(self.name, json.dumps(content))    
 
 class StrategyPlan5(StrategyPlan):
@@ -194,8 +221,15 @@ class StrategyPlan5(StrategyPlan):
     def exe(self):
         amount = self.m2_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
+        buy_price = self.m1_depth['buy_one']['price']
+        sell_price = self.m2_depth['buy_one']['price']-self.skip_price
+
+        if not (self.m1.buy_check(buy_price, amount) and self.m2.sell_check(sell_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return
+
         order_id = self.m1.buy(self.m1_depth['buy_one']['price']+self.skip_price, amount, self.get_planname(), self.get_level(), 0)
-        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'buy'}}
+        content = {'order_id':order_id, 'hedge':{'price': self.m2_depth['buy_one']['price'], 'action':'sell'}}
         r.set(self.name, json.dumps(content))    
 
 class StrategyPlan6(StrategyPlan):
@@ -212,6 +246,13 @@ class StrategyPlan6(StrategyPlan):
     def exe(self):
         amount = self.m1_depth['buy_one']['amount']
         amount = self.adjust_amount(amount)
+        buy_price = self.m2_depth['buy_one']['price']
+        sell_price = self.m1_depth['buy_one']['price']-self.skip_price
+
+        if not (self.m1.sell_check(sell_price, amount) and self.m2.buy_check(buy_price, amount)):
+            logger.info("balance not enough, skip exe")
+            return
+        
         order_id = self.m2.buy(self.m2_depth['buy_one']['price']+self.skip_price, amount, self.get_planname(), self.get_level(), 0)
         content = {'order_id':order_id, 'hedge':{'price': self.m1_depth['buy_one']['price'], 'action':'sell'}}
         r.set(self.name, json.dumps(content))    

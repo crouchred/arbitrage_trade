@@ -1,6 +1,8 @@
 from db import Mysql, Trade, Balance
 from market import market_factory, Binance, Bibox
 from utils.timeutils import v_date_current_hyphen
+import redis
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
 from utils.logger import Logger
 logger = Logger.get_logger(__file__)

@@ -6,14 +6,15 @@ from utils.logger import Logger
 logger = Logger.get_logger("app")
 import traceback
 import schedule
-from cronjob import record_balance
+from cronjob import record_balance, auto_close_out
 
 class Client:
 
     def run(self):
 
         schedule.every(5).seconds.do(self.run_strategy)
-        schedule.every().day.at("13:56").do(record_balance)
+        schedule.every().day.at("06:55").do(record_balance)
+        schedule.every().day.at("05:55").do(auto_close_out)
 
         while True:
             schedule.run_pending()
