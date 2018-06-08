@@ -1,4 +1,8 @@
 binance_api_key = "xxx"
 binance_secret_key="xxx"
 bibox_api_key = "xxx"
-bibox__secret_key="xxx"
+bibox_secret_key="xxx"
+proxies = {
+    'http': 'http://localhost:8123',
+    'https': 'http://localhost:8123'
+}

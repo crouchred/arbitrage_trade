@@ -1,3 +1,8 @@
+incremental
 python-binance
 requests
-incremental
+redis
+sqlalchemy
+pymysql
+schedule
+raven
