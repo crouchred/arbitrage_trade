@@ -1,30 +1,23 @@
 import time
 from strategy import Strategy
 from market import Binance, Bibox
+
 from utils.logger import Logger
 logger = Logger.get_logger("app")
 import traceback
+import schedule
+from cronjob import record_balance
 
 class Client:
 
     def run(self):
-        logger.info("start running")
-        i = 0 
-        while True:
-            if i % 100 == 0:
-                self.refresh_redis()
-                logger.info("%s times to run"%(i))
-            try:
-                self.run_strategy()
-            except Exception:
-                logger.info("the %s times fail"%(i))
-                traceback.print_exc()                
-            time.sleep(5)
-            i += 1
 
-    def refresh_redis(self):
-        """刷新redis中的仓位等信息"""
-        pass
+        schedule.every(5).seconds.do(self.run_strategy)
+        schedule.every().day.at("13:56").do(record_balance)
+
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
 
     def run_strategy(self):
         binance = Binance('EOS', 'BTC')

@@ -4,3 +4,4 @@ requests
 redis
 sqlalchemy
 pymysql
+schedule
