@@ -7,8 +7,11 @@ r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 from utils.logger import Logger
 logger = Logger.get_logger(__file__)
 
+from utils.catch_error import catch_decorator
+
 mysql = Mysql()
 
+@catch_decorator
 def auto_close_out():
     session = mysql.DBSession()
     query = session.query(Trade)
@@ -21,6 +24,7 @@ def auto_close_out():
         the_market.cancel_order(order.orderid)
         the_market.buy(the_market.get_depth()['sell_one']['price'], order.amount, order.plan, 'high', 1)
 
+@catch_decorator
 def record_balance():
     logger.info("start to record balance")
     coins = ['BTC', 'EOS', 'BNB', 'BIX']

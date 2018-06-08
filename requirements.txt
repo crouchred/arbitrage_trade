@@ -5,3 +5,4 @@ redis
 sqlalchemy
 pymysql
 schedule
+raven

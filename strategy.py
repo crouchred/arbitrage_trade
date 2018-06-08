@@ -2,6 +2,9 @@ import redis
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 import json
 
+from utils.logger import Logger
+logger = Logger.get_logger("strategy")
+
 class Strategy:
 
     def __init__(self, m1, m2, min_amount=1, max_amount=5):
