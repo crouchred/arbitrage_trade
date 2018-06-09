@@ -171,7 +171,7 @@ class Binance(Market):
         feecoin_amount = float(result['free']) + float(result['locked'])
 
         result = {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
-        r.set("binance_balance", json.dumps(result), ex=ex)
+        r.set("binance_balance", json.dumps('result'), ex=ex)
         return result
 
     def get_balance_position(self):
