@@ -66,12 +66,16 @@ class Market:
         return product_amount > amount
 
     def buy(self, price, amount, plan, level, is_hedge, orderid=None):
+        if level == 'low':
+            return 
         trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
                 price=price, amount=amount)
         db.upsert_trade(trade)
 
     def sell(self, price, amount, plan, level, is_hedge, orderid=None):
+        if level == 'low':
+            return 
         trade = Trade(orderid=orderid, market=self.market_name, side='SELL', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
                 price=price, amount=amount)
