@@ -61,13 +61,13 @@ class Mysql:
         query = session.query(Trade)
         query_result = query.filter(Trade.orderid==trade.orderid)
         if query_result.first() is None:
-            session.add(trade)
             if trade.level == 'low':
                 logger.debug("-->[%s][order:%s][limit][%s][%s][price:%s][amount:%s]"%( \
                         trade.market, trade.orderid, trade.side, trade.pair, trade.price, trade.amount))
             else:
                 logger.info("-->[%s][order:%s][limit][%s][%s][price:%s][amount:%s]"%( \
                         trade.market, trade.orderid, trade.side, trade.pair, trade.price, trade.amount))
+                session.add(trade)
 
         else:
             columns_update = Trade.__table__.columns.keys()
