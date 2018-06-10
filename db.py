@@ -22,7 +22,8 @@ class Balance(Base):
     
 class Trade(Base):
     __tablename__ = 'trade'
-    orderid = Column(INTEGER, primary_key=True)
+    id = Column(INTEGER, primary_key=True)
+    orderid = Column(INTEGER)
     market = Column(VARCHAR(63))
     pair = Column(VARCHAR(63))
     side = Column(VARCHAR(63))
@@ -31,6 +32,7 @@ class Trade(Base):
     amount = Column(DOUBLE)
     deal_amount = Column(DOUBLE)
     is_hedge = Column(INTEGER)
+    related_orderid = Column(INTEGER)
     level = Column(VARCHAR(63))
     created_at = Column(DATETIME, default=datetime.datetime.now)
     updated_at = Column(DATETIME, onupdate=datetime.datetime.now)

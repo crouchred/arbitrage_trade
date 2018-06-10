@@ -14,6 +14,7 @@ mysql = Mysql()
 @catch_decorator
 def auto_close_out():
     # 包含自动平仓及更新所有订单信息
+    # is_hedge=2 代表取消了之后重新下单
     session = mysql.DBSession()
     query = session.query(Trade)
     #query_result = query.filter(Trade.is_hedge==1).filter(Trade.updated_at==None)
@@ -27,7 +28,7 @@ def auto_close_out():
         the_market.cancel_order(order_db.orderid, order_detail['deal_amount'], just_close)
         if just_close is False and order_db.is_hedge == 1:
             the_market.buy(the_market.get_depth()['sell_one']['price'], \
-                    order_detail['amount']-order_detail['deal_amount'], order_db.plan, 'high', 1)
+                    order_detail['amount']-order_detail['deal_amount'], order_db.plan, 'high', 2, order_db.orderid)
 
 @catch_decorator
 def record_balance():

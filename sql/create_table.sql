@@ -31,5 +31,3 @@ CREATE TABLE `trade` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk` (`orderid`,`market`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-SET FOREIGN_KEY_CHECKS = 1;

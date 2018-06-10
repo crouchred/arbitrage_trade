@@ -65,16 +65,16 @@ class Market:
         product_amount = self.get_balance()['product']
         return product_amount > amount
 
-    def buy(self, price, amount, plan, level, is_hedge, orderid=None):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
-                price=price, amount=amount)
+                price=price, amount=amount, related_orderid=related_orderid)
         db.upsert_trade(trade)
 
-    def sell(self, price, amount, plan, level, is_hedge, orderid=None):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='SELL', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
-                price=price, amount=amount)
+                price=price, amount=amount, related_orderid=related_orderid)
         db.upsert_trade(trade)
 
     def get_depth(self):
@@ -198,14 +198,14 @@ class Binance(Market):
                     })
         return result
 
-    def buy(self, price, amount, plan, level, is_hedge):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid=None):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
         orderid = order['orderId']
-        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def sell(self, price, amount, plan, level, is_hedge):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
         order = self.client.order_limit_sell(
@@ -213,7 +213,7 @@ class Binance(Market):
             quantity=amount,
             price=price)
         orderid = order['orderId']
-        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
     def cancel_order(self, orderid, deal_amount=0 ,just_close=False):
@@ -310,14 +310,14 @@ class Bibox(Market):
                 'price': float(order['price'])
                 }
 
-    def buy(self, price, amount, plan, level, is_hedge):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid=None):
         orderid = self.__post_order(1, price, amount)
-        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def sell(self, price, amount, plan, level, is_hedge):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None):
         orderid = self.__post_order(2, price, amount)
-        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
     def cancel_order(self, orderid, deal_amount=0 ,just_close=False):
