@@ -65,21 +65,17 @@ class Market:
         product_amount = self.get_balance()['product']
         return product_amount > amount
 
-    def buy(self, price, amount, plan, level, is_hedge, orderid=None):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
-                price=price, amount=amount)
+                price=price, amount=amount, related_orderid=related_orderid)
         db.upsert_trade(trade)
 
-    def sell(self, price, amount, plan, level, is_hedge, orderid=None):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='SELL', \
                 pair=self.standard_pair, plan=plan, level=level, is_hedge=is_hedge, \
-                price=price, amount=amount)
+                price=price, amount=amount, related_orderid=related_orderid)
         db.upsert_trade(trade)
-
-    def cancel_order(self, orderid):
-        trade = Trade(orderid=orderid, deal_amount=0)
-        db.upsert_trade(trade, columns_change =['deal_amount'])
 
     def get_depth(self):
         """ return 
@@ -202,14 +198,14 @@ class Binance(Market):
                     })
         return result
 
-    def buy(self, price, amount, plan, level, is_hedge):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid=None):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
         orderid = order['orderId']
-        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def sell(self, price, amount, plan, level, is_hedge):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
             quantity=amount, price=price)
         order = self.client.order_limit_sell(
@@ -217,15 +213,17 @@ class Binance(Market):
             quantity=amount,
             price=price)
         orderid = order['orderId']
-        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def cancel_order(self, orderid):
-        result = self.client.cancel_order(
-            symbol=self.trade_pair,
-            orderId=orderid)
-        logger.debug("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, orderid))
-        super().cancel_order(orderid=orderid)
+    def cancel_order(self, orderid, deal_amount=0 ,just_close=False):
+        if not just_close:
+            result = self.client.cancel_order(
+                symbol=self.trade_pair,
+                orderId=orderid)
+            logger.debug("-->[binance][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        trade = Trade(orderid=orderid, deal_amount=deal_amount)
+        db.upsert_trade(trade, columns_change =['deal_amount'])
         return 0
 
     def get_depth(self, min_amount=0):
@@ -312,29 +310,31 @@ class Bibox(Market):
                 'price': float(order['price'])
                 }
 
-    def buy(self, price, amount, plan, level, is_hedge):
+    def buy(self, price, amount, plan, level, is_hedge, related_orderid=None):
         orderid = self.__post_order(1, price, amount)
-        super().buy(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().buy(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def sell(self, price, amount, plan, level, is_hedge):
+    def sell(self, price, amount, plan, level, is_hedge, related_orderid=None):
         orderid = self.__post_order(2, price, amount)
-        super().sell(price, amount, plan, level, is_hedge, orderid=orderid)
+        super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
 
-    def cancel_order(self, orderid):
-        url = "https://api.bibox.com/v1/orderpending"
-        cmds = [
-                {
-                    'cmd': 'orderpending/cancelTrade',
-                    'body': {
-                        'orders_id': orderid
+    def cancel_order(self, orderid, deal_amount=0 ,just_close=False):
+        if not just_close:
+            url = "https://api.bibox.com/v1/orderpending"
+            cmds = [
+                    {
+                        'cmd': 'orderpending/cancelTrade',
+                        'body': {
+                            'orders_id': orderid
+                            }
                         }
-                    }
-                ]
-        data =  self.__doApiRequestWithApikey(url,cmds)
-        logger.debug("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, orderid))
-        super().cancel_order(orderid=orderid)
+                    ]
+            data =  self.__doApiRequestWithApikey(url,cmds)
+            logger.debug("-->[bibox][cancel][%s][order:%s]"%(self.trade_pair, orderid))
+        trade = Trade(orderid=orderid, deal_amount=deal_amount)
+        db.upsert_trade(trade, columns_change =['deal_amount'])
         return 0
 
     def get_open_orders(self):
@@ -476,22 +476,23 @@ class Bibox(Market):
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
 if __name__=="__main__":
-    bibox = Bibox('EOS', 'BTC')
+    pass
+#    bibox = Bibox('EOS', 'BTC')
 #    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
-    print(bibox.get_balance())
-    print(bibox.get_balance_position())
+#    print(bibox.get_balance())
+#    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
 #    print(bibox.clear_open_orders())
 #
-    print("bibox<------->binance")
-    binance = Binance('EOS', 'BTC')
+#    print("bibox<------->binance")
+#    binance = Binance('EOS', 'BTC')
 #    print(binance.get_order_detail(56126001))
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
-    print(binance.get_balance())
-    print(binance.get_balance_position())
+#    print(binance.get_balance())
+#    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
 #    print(binance.clear_open_orders())
 #
