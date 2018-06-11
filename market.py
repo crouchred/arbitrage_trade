@@ -13,7 +13,6 @@ from db import Mysql, Trade
 db = Mysql()
 
 import redis
-r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 ex=10
 
 def market_factory(name):
@@ -28,6 +27,7 @@ class Market:
         self.product = product.upper()
         self.basecoin = basecoin.upper()
         self.feecoin = ""
+        self.redis = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
     @property
     def market_name(self):
@@ -150,7 +150,7 @@ class Binance(Market):
         return result
 
     def get_balance(self):
-        binance_balance = r.get("binance_balance")
+        binance_balance = self.redis.get("binance_balance")
         if binance_balance:
             return json.loads(binance_balance)
         logger.debug("binance balance expire")
@@ -163,11 +163,11 @@ class Binance(Market):
         feecoin_amount = float(result['free']) + float(result['locked'])
 
         result = {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
-        r.set("binance_balance", json.dumps(result), ex=ex)
+        self.redis.set("binance_balance", json.dumps(result), ex=ex)
         return result
 
     def get_balance_position(self):
-        binance_balance_position = r.get("binance_balance_position")
+        binance_balance_position = self.redis.get("binance_balance_position")
         if binance_balance_position:
             return float(binance_balance_position)
         logger.debug("binance balance position expire")
@@ -181,7 +181,7 @@ class Binance(Market):
         price = (depth['buy_one']['price'] + depth['sell_one']['price'])/2
 
         result = product_amount*price / (product_amount*price+basecoin_amount)
-        r.set("binance_balance_position", result, ex=ex)
+        self.redis.set("binance_balance_position", result, ex=ex)
         return result
 
     def get_open_orders(self):
@@ -237,14 +237,14 @@ class Binance(Market):
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
     def _get_week_prices(self):
-        week_price = r.get("binance_week_price")
+        week_price = self.redis.get("binance_week_price")
         if week_price:
             return json.loads(week_price)
         logger.debug("binance week_price expire")
 
         data = self.client.get_klines(symbol=self.trade_pair, interval=Client.KLINE_INTERVAL_1HOUR)[-72:-1]
         closes = [float(i[4]) for i in data]
-        r.set("binance_week_price", json.dumps(closes), ex=3600)
+        self.redis.set("binance_week_price", json.dumps(closes), ex=3600)
         return closes
 
 class Bibox(Market):
@@ -393,7 +393,7 @@ class Bibox(Market):
 
     def get_balance(self):
 
-        bibox_balance= r.get("bibox_balance")
+        bibox_balance= self.redis.get("bibox_balance")
         if bibox_balance:
             return json.loads(bibox_balance)
         logger.debug("bibox balance expire")
@@ -416,11 +416,11 @@ class Bibox(Market):
             elif asset['coin_symbol'] == self.feecoin:
                 feecoin_amount = float(asset['balance'])
         result = {'product': product_amount, 'basecoin': basecoin_amount, 'feecoin': feecoin_amount}
-        r.set("bibox_balance", json.dumps(result), ex=ex)
+        self.redis.set("bibox_balance", json.dumps(result), ex=ex)
         return result
 
     def get_balance_position(self):
-        bibox_balance_position = r.get("bibox_balance_position")
+        bibox_balance_position = self.redis.get("bibox_balance_position")
         if bibox_balance_position:
             return float(bibox_balance_position)
         logger.debug("bibox balance position expire")
@@ -446,11 +446,11 @@ class Bibox(Market):
                 product_balance = float(asset['CNYValue'])
 
         result = product_balance / (product_balance + basecoin_balance)
-        r.set("bibox_balance_position", result, ex=ex)
+        self.redis.set("bibox_balance_position", result, ex=ex)
         return result
 
     def _get_week_prices(self):
-        week_price = r.get("bibox_week_price")
+        week_price = self.redis.get("bibox_week_price")
         if week_price:
             return json.loads(week_price)
         logger.debug("bibox week_price expire")
@@ -464,7 +464,7 @@ class Bibox(Market):
                 time.sleep(2)
         data = json.loads(r.text)
         closes = [float(i['close']) for i in data['result']]
-        r.set("bibox_week_price", json.dumps(closes), ex=3600)
+        self.redis.set("bibox_week_price", json.dumps(closes), ex=3600)
         return closes
 
     def get_depth(self, min_amount=0):
