@@ -237,8 +237,14 @@ class Binance(Market):
         return {'buy_one': buy_one, 'sell_one': sell_one}
 
     def _get_week_prices(self):
+        week_price = r.get("binance_week_price")
+        if week_price:
+            return json.loads(week_price)
+        logger.debug("binance week_price expire")
+
         data = self.client.get_klines(symbol=self.trade_pair, interval=Client.KLINE_INTERVAL_1HOUR)[-72:-1]
         closes = [float(i[4]) for i in data]
+        r.set("binance_week_price", json.dumps(closes), ex=3600)
         return closes
 
 class Bibox(Market):
@@ -444,7 +450,11 @@ class Bibox(Market):
         return result
 
     def _get_week_prices(self):
-        """过去一周的每小时close价格"""
+        week_price = r.get("bibox_week_price")
+        if week_price:
+            return json.loads(week_price)
+        logger.debug("bibox week_price expire")
+        
         url = "https://api.bibox.com/v1/mdata?cmd=kline&pair={trade_pair}&period=1hour&size=72" \
                 .format(trade_pair=self.trade_pair)
         for _ in range(3):
@@ -454,6 +464,7 @@ class Bibox(Market):
                 time.sleep(2)
         data = json.loads(r.text)
         closes = [float(i['close']) for i in data['result']]
+        r.set("bibox_week_price", json.dumps(closes), ex=3600)
         return closes
 
     def get_depth(self, min_amount=0):
