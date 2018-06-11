@@ -133,7 +133,6 @@ class StrategyPlan1(StrategyPlan):
         buy_price = self.m2_depth['sell_one']['price']
 
         if not (self.m1.sell_check(sell_price, amount) and self.m2.buy_check(buy_price, amount)):
-            logger.info("balance not enough, skip exe")
             return 
         related_orderid = self.m1.sell(sell_price, amount, self.get_planname(), self.get_level(), 0)
         self.m2.buy(buy_price, amount, self.get_planname(), self.get_level(), 0, related_orderid)
@@ -155,7 +154,6 @@ class StrategyPlan2(StrategyPlan):
         sell_price = self.m2_depth['buy_one']['price']
 
         if not (self.m1.buy_check(buy_price, amount) and self.m2.sell_check(sell_price, amount)):
-            logger.info("balance not enough, skip exe")
             return 
         related_orderid = self.m1.buy(buy_price, amount, self.get_planname(), self.get_level(), 0)
         self.m2.sell(sell_price, amount, self.get_planname(), self.get_level(), 0, related_orderid)

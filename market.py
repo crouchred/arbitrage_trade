@@ -59,11 +59,17 @@ class Market:
 
     def buy_check(self, price, amount):
         basecoin_amount = self.get_balance()['basecoin']
-        return basecoin_amount > price * amount
+        check =  basecoin_amount > price * amount
+        if not check:
+            logger.info("%s buy balance not enough"%(self.market_name))
+        return  check
 
     def sell_check(self, price, amount):
         product_amount = self.get_balance()['product']
-        return product_amount > amount
+        check = product_amount > amount
+        if not check:
+            logger.info("%s sell balance not enough"%(self.market_name))
+        return  check
 
     def buy(self, price, amount, plan, level, is_hedge, related_orderid, orderid=None):
         trade = Trade(orderid=orderid, market=self.market_name, side='BUY', \
