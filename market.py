@@ -200,7 +200,7 @@ class Binance(Market):
 
     def buy(self, price, amount, plan, level, is_hedge, related_orderid=None):
         order = self.client.order_limit_buy(symbol=self.trade_pair, \
-            quantity=amount, price=price)
+            quantity=amount, price=round(price, 7))
         orderid = order['orderId']
         super().buy(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
@@ -211,7 +211,7 @@ class Binance(Market):
         order = self.client.order_limit_sell(
             symbol=self.trade_pair,
             quantity=amount,
-            price=price)
+            price=round(price))
         orderid = order['orderId']
         super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
@@ -477,22 +477,22 @@ class Bibox(Market):
 
 if __name__=="__main__":
     pass
-#    bibox = Bibox('EOS', 'BTC')
+    bibox = Bibox('EOS', 'BTC')
 #    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
 #    print(bibox.get_balance())
 #    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
-#    print(bibox.clear_open_orders())
+    print(bibox.clear_open_orders())
 #
 #    print("bibox<------->binance")
-#    binance = Binance('EOS', 'BTC')
+    binance = Binance('EOS', 'BTC')
 #    print(binance.get_order_detail(56126001))
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
 #    print(binance.get_balance())
 #    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
-#    print(binance.clear_open_orders())
+    print(binance.clear_open_orders())
 #
