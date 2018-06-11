@@ -259,12 +259,13 @@ class Bibox(Market):
     def __doApiRequestWithApikey(self, url, cmds):
         s_cmds = json.dumps(cmds)
         sign = self.__getSign(s_cmds, bibox_secret_key)
-        r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
-                proxies=proxies)
-        try:
-            return json.loads(r.text)['result'][0]['result']
-        except Exception:
-            traceback.print_exc()
+        for _ in range(2):
+            try:
+                r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
+                    proxies=proxies)
+                return json.loads(r.text)['result'][0]['result']
+            except Exception:
+                traceback.print_exc()
 
     def __post_order(self, order_side, price, amount, order_type=2):
         """
