@@ -265,13 +265,13 @@ class Bibox(Market):
     def __doApiRequestWithApikey(self, url, cmds):
         s_cmds = json.dumps(cmds)
         sign = self.__getSign(s_cmds, bibox_secret_key)
-        for _ in range(2):
+        for _ in range(1):
             try:
                 r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
                     proxies=proxies)
                 return json.loads(r.text)['result'][0]['result']
             except Exception:
-                traceback.print_exc()
+                logger.info(r.text)
 
     def __post_order(self, order_side, price, amount, order_type=2):
         """
@@ -489,22 +489,23 @@ class Bibox(Market):
 
 if __name__=="__main__":
     pass
-    bibox = Bibox('EOS', 'BTC')
+#    bibox = Bibox('EOS', 'BTC')
 #    print(bibox.get_order_detail(594940813))
 #    print(bibox.get_average_price())
 #    print(bibox.get_depth())
 #    print(bibox.get_balance())
 #    print(bibox.get_balance_position())
 #    print(bibox.get_open_orders())
-    print(bibox.clear_open_orders())
+#    print(bibox.clear_open_orders())
 #
 #    print("bibox<------->binance")
-    binance = Binance('EOS', 'BTC')
-#    print(binance.get_order_detail(56126001))
+#    binance = Binance('EOS', 'BTC')
+#    print(binance.get_order_detail(61497650))
+#    binance.cancel_order(61497650)
 #    print(binance.get_average_price())
 #    print(binance.get_depth())
 #    print(binance.get_balance())
 #    print(binance.get_balance_position())
 #    print(binance.get_open_orders())
-    print(binance.clear_open_orders())
+#    print(binance.clear_open_orders())
 #
