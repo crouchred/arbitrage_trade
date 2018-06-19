@@ -275,7 +275,10 @@ class Bibox(Market):
             try:
                 r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
                     proxies=proxies)
-                return json.loads(r.text)['result'][0]['result']
+                result = json.loads(r.text)['result'][0]
+                if result.get('error') == {'code': '2033', 'msg': '操作失败！订单已完成或已撤销'}:
+                    return 
+                return result['result']
             except Exception:
                 logger.info(r.text)
 
