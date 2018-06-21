@@ -6,6 +6,7 @@ import json, requests
 import traceback
 
 from config import *
+from utils.retry import retry
 from utils.logger import Logger
 logger = Logger.get_logger("market")
 
@@ -155,6 +156,7 @@ class Binance(Market):
                 result.append({'market':'binance', 'coin': coin, 'amount': float(tmp['free']) + float(tmp['locked'])})
         return result
 
+    @retry()
     def get_balance(self):
         binance_balance = self.redis.get("binance_balance")
         if binance_balance:
@@ -172,6 +174,7 @@ class Binance(Market):
         self.redis.set("binance_balance", json.dumps(result), ex=ex)
         return result
 
+    @retry()
     def get_balance_position(self):
         binance_balance_position = self.redis.get("binance_balance_position")
         if binance_balance_position:
