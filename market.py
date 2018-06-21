@@ -59,14 +59,14 @@ class Market:
 
     def buy_check(self, price, amount):
         basecoin_amount = self.get_balance()['basecoin']
-        check =  basecoin_amount > price * amount
+        check =  basecoin_amount > price * amount * 1.5
         if not check:
             logger.info("%s buy balance not enough"%(self.market_name))
         return  check
 
     def sell_check(self, price, amount):
         product_amount = self.get_balance()['product']
-        check = product_amount > amount
+        check = product_amount > amount * 1.5
         if not check:
             logger.info("%s sell balance not enough"%(self.market_name))
         return  check
