@@ -41,7 +41,7 @@ class Mysql:
 
     def __init__(self):
 
-        engine = create_engine("mysql+pymysql://root:root@localhost:3306/arbitrage_trade?charset=utf8")
+        engine = create_engine("mysql+pymysql://root:root@localhost:3306/arbitrage_trade?charset=utf8", pool_size=20, max_overflow=20)
         self.DBSession = sessionmaker(bind=engine)
 
     def insert_balance(self, balance_list, date):
