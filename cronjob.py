@@ -26,7 +26,7 @@ def auto_close_out():
         order_detail = the_market.get_order_detail(order_db.orderid)
         just_close = True if order_detail['amount'] == order_detail['deal_amount'] else False
         the_market.cancel_order(order_db.orderid, order_detail['deal_amount'], just_close)
-        if just_close is False and order_db.is_hedge == 1:
+        if just_close is False and order_db.level == 'high':
             the_market.buy(the_market.get_depth()['sell_one']['price'], \
                     order_detail['amount']-order_detail['deal_amount'], order_db.plan, 'high', 2, order_db.orderid)
 
