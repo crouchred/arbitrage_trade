@@ -6,6 +6,7 @@ import json, requests
 import traceback
 
 from config import *
+from utils.retry import retry
 from utils.logger import Logger
 logger = Logger.get_logger("market")
 
@@ -59,14 +60,14 @@ class Market:
 
     def buy_check(self, price, amount):
         basecoin_amount = self.get_balance()['basecoin']
-        check =  basecoin_amount > price * amount
+        check =  basecoin_amount > price * amount * 1.5
         if not check:
             logger.info("%s buy balance not enough"%(self.market_name))
         return  check
 
     def sell_check(self, price, amount):
         product_amount = self.get_balance()['product']
-        check = product_amount > amount
+        check = product_amount > amount * 1.5
         if not check:
             logger.info("%s sell balance not enough"%(self.market_name))
         return  check
@@ -155,6 +156,7 @@ class Binance(Market):
                 result.append({'market':'binance', 'coin': coin, 'amount': float(tmp['free']) + float(tmp['locked'])})
         return result
 
+    @retry()
     def get_balance(self):
         binance_balance = self.redis.get("binance_balance")
         if binance_balance:
@@ -172,6 +174,7 @@ class Binance(Market):
         self.redis.set("binance_balance", json.dumps(result), ex=ex)
         return result
 
+    @retry()
     def get_balance_position(self):
         binance_balance_position = self.redis.get("binance_balance_position")
         if binance_balance_position:
@@ -273,7 +276,10 @@ class Bibox(Market):
             try:
                 r = requests.post(url, data={'cmds': s_cmds, 'apikey': bibox_api_key,'sign':sign}, \
                     proxies=proxies)
-                return json.loads(r.text)['result'][0]['result']
+                result = json.loads(r.text)['result'][0]
+                if result.get('error') == {'code': '2033', 'msg': '操作失败！订单已完成或已撤销'}:
+                    return 
+                return result['result']
             except Exception:
                 logger.info(r.text)
 
