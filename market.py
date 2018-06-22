@@ -215,12 +215,10 @@ class Binance(Market):
         return orderid
 
     def sell(self, price, amount, plan, level, is_hedge, related_orderid=None):
-        order = self.client.order_limit_buy(symbol=self.trade_pair, \
-            quantity=amount, price=price)
         order = self.client.order_limit_sell(
             symbol=self.trade_pair,
             quantity=amount,
-            price=round(price))
+            price=round(price, 7))
         orderid = order['orderId']
         super().sell(price, amount, plan, level, is_hedge, orderid=orderid, related_orderid=related_orderid)
         return orderid
