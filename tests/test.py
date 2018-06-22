@@ -43,6 +43,7 @@ class TestMarketBaseMixin():
     def test_sell(self):
         high = self.client.get_high_price()
         print("high price: %s"%(high))
+        import ipdb;ipdb.set_trace()
         orderid =  self.client.sell(high, self.min_amount, 'test', 'low', 0)
         orders = [o['orderid'] for o in self.client.get_open_orders()]
         time.sleep(0.5)

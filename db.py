@@ -2,6 +2,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, create_engine
 from sqlalchemy.dialects.mysql import VARCHAR, INTEGER, BIGINT, DOUBLE, DATETIME, TEXT
 from sqlalchemy.orm import sessionmaker
+from pymysql.err import OperationalError
+from utils.retry import retry
 import datetime
 
 Base = declarative_base()
@@ -44,6 +46,7 @@ class Mysql:
         engine = create_engine("mysql+pymysql://root:root@localhost:3306/arbitrage_trade?charset=utf8", pool_size=20, max_overflow=20)
         self.DBSession = sessionmaker(bind=engine)
 
+    @retry(exception=OperationalError)
     def insert_balance(self, balance_list, date):
         session = self.DBSession()
         query = session.query(Balance)
@@ -57,6 +60,7 @@ class Mysql:
         else:
             print("already have")
 
+    @retry(exception=OperationalError)
     def upsert_trade(self, trade, columns_change=[], columns_not_change=[]):
 
         session = self.DBSession()
